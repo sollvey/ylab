@@ -98,7 +98,7 @@ async def delete_menu(menu_id: int) -> JSONResponse:
 ######## SUBMENU ########
 #########################
 
-@menu_v1_router.post("/menus/{menu_id}/submenus", tags=["menu"])
+@menu_v1_router.post("/menus/{menu_id}/submenus", tags=["submenu"])
 async def create_submenu(menu_id: int, data: MainFieldsPy) -> JSONResponse:
     """
     Создание нового подменю
