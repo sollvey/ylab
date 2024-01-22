@@ -1,5 +1,5 @@
 from sqlalchemy import text
-from typing import Union, Dict, Tuple
+from typing import Union, Dict
 
 import pandas as pd
 
