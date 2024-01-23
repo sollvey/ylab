@@ -1,24 +1,34 @@
 from pydantic import BaseModel
 from typing import Union
 
+
 class MainFieldsPy(BaseModel):
-    title: Union[str, None]
-    description: Union[str, None]
+    title: str
+    description: str
 
 
 class GetMenuPy(MainFieldsPy):
-    id: int
+    id: Union[int, str]
 
 
-class GetSubmenuPy(BaseModel):
-    id: int
-    menu_id: int
+class GetCountMenuPy(GetMenuPy):
+    submenus_count: Union[int, str]
+    dishes_count: Union[int, str]
+
+
+class GetSubmenuPy(MainFieldsPy):
+    id: Union[int, str]
+    menu_id: Union[int, str]
+
+
+class GetCountSubmenuPy(GetSubmenuPy):
+    dishes_count: Union[int, str]
 
 
 class MainDishPy(MainFieldsPy):
     price: Union[str, float]
 
 
-class GetDishPy(BaseModel):
-    id: int
-    submenu_id: int
+class GetDishPy(MainDishPy):
+    id: Union[int, str]
+    submenu_id: Union[int, str]

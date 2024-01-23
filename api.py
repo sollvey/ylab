@@ -17,11 +17,12 @@ async def create_menu(data: MainFieldsPy) -> JSONResponse:
     Создание нового меню
     """
     try:
-        await create_row(
-            data=dict(data),
-            table="menu",
+        data = dict(data)
+        menu_id = await create_row(data=data, table="menu")
+        return JSONResponse(
+            {"id": str(menu_id)} | data,
+            status_code=201
         )
-        return JSONResponse({"message": "Меню создано"}, status_code=201)
     except Exception as exception:
         return JSONResponse({"message": exception}, status_code=400)
     
@@ -41,7 +42,7 @@ async def menu_list() -> List[GetMenuPy]:
 
 
 @menu_v1_router.get("/menus/{menu_id}", tags=["menu"])
-async def menu(menu_id: int) -> GetMenuPy:
+async def menu(menu_id: int) -> GetCountMenuPy:
     """
     Получение меню
     """
@@ -52,13 +53,25 @@ async def menu(menu_id: int) -> GetMenuPy:
         )
         if menu.empty:
             return JSONResponse(
-                {"message": "menu not found", "content": []},
+                {"message": "menu not found", "detail": "menu not found"},
                 status_code=404,
             )
         menu = menu.to_dict(orient="records")[0]
-        menu["title"] = None
-        menu["description"] = None
-        return GetMenuPy(**menu)
+        submenus = await get_rows(
+            table="submenu",
+            conditions={"menu_id": menu["id"]}
+        )
+        if not submenus.empty:
+            dishes = await get_rows(
+                table="dish",
+                conditions={"submenu_id": submenus["id"].astype(str).tolist()}
+            )
+        else:
+            dishes = pd.DataFrame()
+        menu["id"] = str(menu["id"])
+        menu["submenus_count"] = len(submenus)
+        menu["dishes_count"] = len(dishes)
+        return GetCountMenuPy(**menu)
     except Exception as exception:
         return JSONResponse({"message": exception}, status_code=400)
     
@@ -69,12 +82,13 @@ async def update_menu(menu_id: int, data: MainFieldsPy) -> JSONResponse:
     Обновление меню
     """
     try:
+        data = dict(data)
         await update_row(
-            data=dict(data),
+            data=data,
             table="menu",
             conditions={"id": menu_id},
         )
-        return JSONResponse({"message": "Меню обновлено"}, status_code=200)
+        return JSONResponse(data, status_code=200)
     except Exception as exception:
         return JSONResponse({"message": exception}, status_code=400)
 
@@ -98,17 +112,21 @@ async def delete_menu(menu_id: int) -> JSONResponse:
 ######## SUBMENU ########
 #########################
 
-@menu_v1_router.post("/menus/{menu_id}/submenus", tags=["menu"])
+@menu_v1_router.post("/menus/{menu_id}/submenus", tags=["submenu"])
 async def create_submenu(menu_id: int, data: MainFieldsPy) -> JSONResponse:
     """
     Создание нового подменю
     """
     try:
-        await create_row(
-            data=dict(data) | {"menu_id": menu_id},
+        data = dict(data)
+        submenu_id = await create_row(
+            data=data | {"menu_id": menu_id},
             table="submenu",
         )
-        return JSONResponse({"message": "Подменю создано"}, status_code=201)
+        return JSONResponse(
+            {"id": str(submenu_id)} | data,
+            status_code=201
+        )
     except Exception as exception:
         return JSONResponse({"message": exception}, status_code=400)
     
@@ -128,24 +146,28 @@ async def submenu_list() -> List[GetSubmenuPy]:
 
 
 @menu_v1_router.get("/menus/{menu_id}/submenus/{submenu_id}", tags=["submenu"])
-async def submenu(menu_id: int, submenu_id: int) -> GetSubmenuPy:
+async def submenu(menu_id: int, submenu_id: int) -> GetCountSubmenuPy:
     """
     Получение подменю
     """
     try:
         submenu = await get_rows(
             table="submenu",
-            conditions={"id": submenu_id, "menu_id": menu_id},
+            conditions={"menu_id": menu_id, "id": submenu_id},
         )
         if submenu.empty:
             return JSONResponse(
-                {"message": "submenu not found", "content": []},
+                {"message": "submenu not found", "detail": "submenu not found"},
                 status_code=404,
             )
         submenu = submenu.to_dict(orient="records")[0]
-        submenu["title"] = None
-        submenu["description"] = None
-        return GetSubmenuPy(**submenu)
+        dishes = await get_rows(
+            table="dish",
+            conditions={"submenu_id": submenu["id"]}
+        )
+        submenu["id"] = str(submenu["id"])
+        submenu["dishes_count"] = len(dishes)
+        return GetCountSubmenuPy(**submenu)
     except Exception as exception:
         return JSONResponse({"message": exception}, status_code=400)
     
@@ -156,12 +178,13 @@ async def update_submenu(menu_id: int, submenu_id: int, data: MainFieldsPy) -> J
     Обновление подменю
     """
     try:
+        data = dict(data)
         await update_row(
-            data=dict(data),
+            data=data,
             table="submenu",
             conditions={"id": submenu_id, "menu_id": menu_id},
         )
-        return JSONResponse({"message": "Подменю обновлено"}, status_code=200)
+        return JSONResponse(data, status_code=200)
     except Exception as exception:
         return JSONResponse({"message": exception}, status_code=400)
 
@@ -195,11 +218,15 @@ async def create_dish(menu_id: int, submenu_id: int, data: MainDishPy) -> JSONRe
         data = dict(data)
         if isinstance(data["price"], str):
             data["price"] = float(data["price"])
-        await create_row(
+        dish_id = await create_row(
             data=data | {"submenu_id": submenu_id},
             table="dish",
         )
-        return JSONResponse({"message": "Блюдо создано"}, status_code=201)
+        data["price"] = f"{data['price']:.2f}"
+        return JSONResponse(
+            {"id": str(dish_id)} | data,
+            status_code=201
+        )
     except Exception as exception:
         return JSONResponse({"message": exception}, status_code=400)
     
@@ -230,12 +257,12 @@ async def dish(menu_id: int, submenu_id: int, dish_id: int) -> GetDishPy:
         )
         if dish.empty:
             return JSONResponse(
-                {"message": "dish not found", "content": []},
+                {"message": "dish not found", "detail": "dish not found"},
                 status_code=404,
             )
         dish = dish.to_dict(orient="records")[0]
-        dish["title"] = None
-        dish["description"] = None
+        dish["id"] = str(dish["id"])
+        dish["price"] = f"{dish['price']:.2f}"
         return GetDishPy(**dish)
     except Exception as exception:
         return JSONResponse({"message": exception}, status_code=400)
@@ -246,18 +273,19 @@ async def update_dish(
     menu_id: int,
     submenu_id: int,
     dish_id: int,
-    data: MainFieldsPy
+    data: MainDishPy
 ) -> JSONResponse:
     """
     Обновление блюда
     """
     try:
+        data = dict(data)
         await update_row(
-            data=dict(data) | {"submenu_id": submenu_id},
+            data=data | {"submenu_id": submenu_id},
             table="dish",
             conditions={"id": dish_id, "submenu_id": submenu_id},
         )
-        return JSONResponse({"message": "Блюдо обновлено"}, status_code=200)
+        return JSONResponse(data, status_code=200)
     except Exception as exception:
         return JSONResponse({"message": exception}, status_code=400)
 

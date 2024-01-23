@@ -1,5 +1,5 @@
 from sqlalchemy import text
-from typing import Union, Dict, Tuple
+from typing import Union, Dict, List
 
 import pandas as pd
 
@@ -9,22 +9,27 @@ from session import get_session
 def format_value(value):
     if isinstance(value, str):
         return f"'{value}'"
+    elif isinstance(value, list):
+        return '(' + ", ".join(value) + ')'
     return f"{value}"
 
 
 def data_to_line(
-    data: Dict[str, Union[str, int, float]],
-    sep: str = ','
+    data: Dict[str, Union[int, List[str]], str],
+    sep: str = ',',
+    operator: str = "="
 ) -> str:
     lines = []
     for column, value in data.items():
-        lines.append(f"{column} = {format_value(value)}")
+        if isinstance(value, list):
+            operator = "IN"
+        lines.append(f"{column} {operator} {format_value(value)}")
     return f"{sep}".join(lines)
 
 
 async def delete_row(
     table: str,
-    conditions: Dict[str, int] = None,
+    conditions: Dict[str, Union[int, List[str]]] = None,
     schema: str = "public",
 ) -> None:
     """
@@ -48,7 +53,7 @@ async def delete_row(
 async def update_row(
     data: Dict[str, Union[str, int, float]],
     table: str,
-    conditions: Dict[str, int] = None,
+    conditions: Dict[str, Union[int, List[str]]] = None,
     schema: str = "public",
 ) -> None:
     """
@@ -73,7 +78,7 @@ async def update_row(
 
 async def get_rows(
     table: str,
-    conditions: Dict[str, int] = None,
+    conditions: Dict[str, Union[int, List[str]]] = None,
     schema: str = "public",
 ) -> pd.DataFrame:
     """
@@ -98,7 +103,7 @@ async def create_row(
     data: Dict[str, Union[str, int, float]],
     table: str,
     schema: str = "public",
-) -> None:
+) -> int:
     """
     Создание записи в таблицу
     """
@@ -113,3 +118,15 @@ async def create_row(
             )
         )
         session.commit()
+
+        row_id = session.execute(
+            text(
+                f"""
+                SELECT id
+                FROM {schema}.{table}
+                ORDER BY id DESC
+                LIMIT 1
+                """
+            )
+        ).one()
+        return row_id[0]
