@@ -15,7 +15,7 @@ def format_value(value):
 
 
 def data_to_line(
-    data: Dict[str, Union[int, List[str]], str],
+    data: Dict[str, Union[int, List[str]]],
     sep: str = ',',
     operator: str = "="
 ) -> str:
