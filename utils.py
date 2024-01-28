@@ -3,7 +3,7 @@ from typing import Union, Dict, List
 
 import pandas as pd
 
-from session import get_session
+from session import get_session, path_prefix
 
 
 def format_value(value):

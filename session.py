@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+path_prefix = "/api/v1"
 db_engine = "postgresql+psycopg2"
 db_host = environ["DBHOST"]
 db_port = environ["DBPORT"]

@@ -4,8 +4,9 @@ from typing import List
 
 from schemas import *
 from utils import *
+from models import *
 
-menu_v1_router = APIRouter(prefix="/api/v1")
+menu_v1_router = APIRouter(prefix=path_prefix)
 
 ######################
 ######## MENU ########
@@ -57,17 +58,21 @@ async def menu(menu_id: int) -> GetCountMenuPy:
                 status_code=404,
             )
         menu = menu.to_dict(orient="records")[0]
-        submenus = await get_rows(
-            table="submenu",
-            conditions={"menu_id": menu["id"]}
-        )
-        if not submenus.empty:
-            dishes = await get_rows(
-                table="dish",
-                conditions={"submenu_id": submenus["id"].astype(str).tolist()}
-            )
-        else:
-            dishes = pd.DataFrame()
+        with get_session() as session:
+            submenus = session.query(SubmenuPy).filter(
+                SubmenuPy.menu_id == menu_id
+            ).all()
+            submenus_ids = [subm.id for subm in submenus]
+            if submenus_ids:
+                dishes = session.query(DishPy).filter(
+                    DishPy.submenu_id.in_(submenus_ids)
+                ).join(
+                    SubmenuPy, DishPy.submenu_id == SubmenuPy.id
+                ).filter(
+                    SubmenuPy.menu_id == menu_id
+                ).all()
+            else:
+                dishes = []
         menu["id"] = str(menu["id"])
         menu["submenus_count"] = len(submenus)
         menu["dishes_count"] = len(dishes)
@@ -161,10 +166,14 @@ async def submenu(menu_id: int, submenu_id: int) -> GetCountSubmenuPy:
                 status_code=404,
             )
         submenu = submenu.to_dict(orient="records")[0]
-        dishes = await get_rows(
-            table="dish",
-            conditions={"submenu_id": submenu["id"]}
-        )
+        with get_session() as session:
+            dishes = session.query(DishPy).filter(
+                DishPy.submenu_id == submenu_id
+            ).join(
+                SubmenuPy, DishPy.submenu_id == SubmenuPy.id
+            ).filter(
+                SubmenuPy.menu_id == menu_id
+            ).all()
         submenu["id"] = str(submenu["id"])
         submenu["dishes_count"] = len(dishes)
         return GetCountSubmenuPy(**submenu)
